@@ -30,5 +30,6 @@
   "python.testing.unittestArgs": ["-v", "-s", ".", "-p", "test_*.py"],
   "python.testing.unittestEnabled": true,
   "typescript.suggest.paths": false,
-  "workbench.editor.enablePreview": false
+  "workbench.editor.enablePreview": false,
+  "cSpell.words": ["sixnimmt", "structlog", "websockets"]
 }

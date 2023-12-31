@@ -16,6 +16,9 @@ ruff = "^0.1.8"
 poethepoet = "^0.24.4"
 rich = "^13.7.0"
 
+[tool.poe.tasks.dev]
+script = "app:run"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
