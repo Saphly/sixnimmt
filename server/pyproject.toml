@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "sixnimmt"
+version = "0.1.0"
+description = "Python-based websocket server for 6 nimmt!, a fast-playing game of trying to avoid being the person to collect cards from a growing tableau of horrible risks."
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+websockets = "12.0"
+structlog = "23.3.0"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.1.8"
+poethepoet = "^0.24.4"
+rich = "^13.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
