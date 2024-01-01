@@ -66,8 +66,8 @@ class Player:
         return hash(self.player_id)
 
     @property
-    def player_id(self):
-        return self.connection.id
+    def player_id(self) -> str:
+        return str(self.connection.id)
 
     @property
     def score(self):
