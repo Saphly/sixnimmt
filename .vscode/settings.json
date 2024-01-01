@@ -27,9 +27,10 @@
   "python.analysis.typeCheckingMode": "strict",
   "python.analysis.useLibraryCodeForTypes": true,
   "python.languageServer": "Pylance",
-  "python.testing.unittestArgs": ["-v", "-s", ".", "-p", "test_*.py"],
-  "python.testing.unittestEnabled": true,
+  "python.testing.pytestEnabled": true,
   "typescript.suggest.paths": false,
   "workbench.editor.enablePreview": false,
-  "cSpell.words": ["sixnimmt", "structlog", "websockets"]
+  "cSpell.words": ["sixnimmt", "structlog", "websockets"],
+  "python.testing.pytestArgs": ["server"],
+  "python.testing.unittestEnabled": false
 }

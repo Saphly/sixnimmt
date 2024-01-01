@@ -15,9 +15,14 @@ structlog = "23.3.0"
 ruff = "^0.1.8"
 poethepoet = "^0.24.4"
 rich = "^13.7.0"
+pytest = "^7.4.4"
 
 [tool.poe.tasks.dev]
-script = "app:run"
+script = "sixnimmt.app:run"
+
+[tool.pytest.ini_options]
+minversion = "7.4.4"
+
 
 [build-system]
 requires = ["poetry-core"]

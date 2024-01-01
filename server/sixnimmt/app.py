@@ -2,7 +2,8 @@ import asyncio
 
 import structlog
 import websockets as ws
-from sixnimmt.handler import handler
+
+from .handler import handler
 
 logger = structlog.stdlib.get_logger()
 
