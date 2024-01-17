@@ -29,7 +29,7 @@ def make_player() -> PlayerMaker:
 
 
 @pytest.fixture
-def board():
+def board() -> Board:
     board = Board()
 
     board.board[0].append(Card(5))
@@ -41,9 +41,53 @@ def board():
 
 
 @pytest.fixture
-def session():
+def session() -> Session:
     session = Session("id")
     return session
+
+
+@pytest.fixture
+def session_with_min_players(make_player: PlayerMaker) -> Session:
+    session = Session("id")
+
+    for i in range(session.min_players):
+        session.players.add(make_player(str(i)))
+
+    return session
+
+
+@pytest.fixture
+def started_session(
+    session_with_min_players: Session,
+    player_one: Player,
+    player_two: Player,
+    board: Board,
+) -> Session:
+    session_with_min_players.start()
+
+    player_one.hand.pop()
+    player_one.hand.add(Card(1))
+
+    player_two.hand.pop()
+    player_two.hand.add(Card(2))
+
+    session_with_min_players.board = board
+
+    return session_with_min_players
+
+
+@pytest.fixture
+def player_one(session_with_min_players: Session) -> Player:
+    return next(
+        player for player in session_with_min_players.players if player.player_id == "0"
+    )
+
+
+@pytest.fixture
+def player_two(session_with_min_players: Session) -> Player:
+    return next(
+        player for player in session_with_min_players.players if player.player_id == "1"
+    )
 
 
 class TestCard:
@@ -159,6 +203,54 @@ class TestSessionStart:
 
         assert session.start() is True
 
+    def test_start_session_if_under_max_players(
+        self, session: Session, make_player: PlayerMaker
+    ):
+        for i in range(session.max_players):
+            session.players.add(make_player(str(i)))
+
+        session.players.add(make_player("extra"))
+
+        assert session.start() is False
+
+    def test_start_session_if_player_has_hand(
+        self, session: Session, make_player: PlayerMaker
+    ):
+        for i in range(session.min_players):
+            new_player = make_player(str(i))
+            new_player.hand.add(Card(i + 1))
+            session.players.add(new_player)
+
+        assert session.start() is False
+
+    def test_start_session_if_session_board_has_cards(
+        self, session_with_min_players: Session, make_player: PlayerMaker
+    ):
+        session_with_min_players.board.board[0].append(Card(55))
+        assert session_with_min_players.start() is False
+
+    def test_start_session_if_session_already_started(
+        self, session_with_min_players: Session
+    ):
+        session_with_min_players.started = True
+
+        assert session_with_min_players.start() is False
+
+    def test_start_session(self, session_with_min_players: Session):
+        assert session_with_min_players.start() is True
+
+        for player in session_with_min_players.players:
+            assert len(player.hand) == session_with_min_players.cards_per_player
+
+        for row in session_with_min_players.board.board:
+            assert len(row) == 1
+
+        assert (
+            len(session_with_min_players.board.board)
+            == session_with_min_players.board.rows
+        )
+        assert session_with_min_players.started is True
+
 
 class TestSessionAddAndRemove:
     """
@@ -172,7 +264,34 @@ class TestSessionAddAndRemove:
     - If player doesn't exist, return false
     """
 
-    ...
+    def test_add_player_after_started(
+        self, session_with_min_players: Session, make_player: PlayerMaker
+    ):
+        session_with_min_players.start()
+
+        assert session_with_min_players.add(make_player("new")) is False
+
+    def test_add_to_max_player_session(
+        self, session: Session, make_player: PlayerMaker
+    ):
+        for i in range(session.max_players):
+            session.add(make_player(str(i)))
+
+        assert session.add(make_player("new")) is False
+
+    def test_add_player(self, session: Session, make_player: PlayerMaker):
+        assert session.add(make_player("new")) is True
+
+    def test_remove_existing_player(self, session: Session, make_player: PlayerMaker):
+        new_player = make_player("new")
+        session.add(new_player)
+
+        assert session.remove(new_player) is True
+
+    def test_remove_nonexisting_player(
+        self, session_with_min_players: Session, player: Player
+    ):
+        assert session_with_min_players.remove(player) is False
 
 
 class TestSessionPlay:
@@ -187,20 +306,105 @@ class TestSessionPlay:
     return true
     """
 
+    def test_play_if_session_not_started(
+        self, session_with_min_players: Session, player_one: Player
+    ):
+        assert session_with_min_players.play(player_one, Card(22)) is False
+
+        session_with_min_players.start()
+        player_one_card = next(iter(player_one.hand))
+
+        assert session_with_min_players.play(player_one, player_one_card) is True
+        assert player_one in session_with_min_players.cards_to_play
+        assert session_with_min_players.cards_to_play[player_one] is player_one_card
+
+    def test_play_when_turn_progressed(
+        self, session_with_min_players: Session, player_one: Player
+    ):
+        session_with_min_players.start()
+        session_with_min_players.progressed = True
+
+        player_one_card = next(iter(player_one.hand))
+
+        assert session_with_min_players.play(player_one, player_one_card) is False
+
+    def test_play_when_player_already_played_a_card(
+        self, session_with_min_players: Session, player_one: Player
+    ):
+        session_with_min_players.start()
+
+        player_one_card = next(iter(player_one.hand))
+        session_with_min_players.play(player_one, player_one_card)
+        next_card = next(iter(player_one.hand))
+
+        assert session_with_min_players.play(player_one, next_card) is False
+
+    def test_play_smallest_card_player(
+        self, started_session: Session, player_one: Player
+    ):
+        assert started_session.smallest_card_player is None
+
+        started_session.play(player_one, Card(1))
+
+        assert started_session.smallest_card_player is not None
+        assert started_session.smallest_card_player is player_one
+
+    def test_play_new_smallest_card_player(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        started_session.play(player_two, Card(2))
+        assert started_session.smallest_card_player is player_two
+
+        started_session.play(player_one, Card(1))
+        assert started_session.smallest_card_player is player_one
+
     ...
 
 
-class TestSessionSelect:
+class TestSessionSelectRow:
     """
     select()
     - If turn is not ready to progress, return false
     - If player is not smallest card player, return false
     - If player chooses an invalid row, return false
-    - If selected row is not empty, return false
+    - If a row is already selected, return false
     - If given valid row, return true
     """
 
-    ...
+    def test_select_when_turn_not_progressed(
+        self, started_session: Session, player_one: Player
+    ):
+        assert started_session.select(player_one, 1) is False
+
+    def test_select_if_not_from_smallest_card_player(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        started_session.play(player_one, Card(1))
+        started_session.play(player_two, Card(2))
+
+        assert len(player_one.hand) == len(player_two.hand)
+        assert started_session.smallest_card_player is player_one
+        assert started_session.selected_row is None
+
+        assert started_session.select(player_two, 1) is False
+        assert started_session.select(player_one, 1) is True
+
+    def test_select_invalid_row(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        started_session.play(player_one, Card(1))
+        started_session.play(player_two, Card(2))
+
+        assert started_session.select(player_one, 100) is False
+
+    def test_select_when_already_selected_row(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        started_session.play(player_one, Card(1))
+        started_session.play(player_two, Card(2))
+
+        assert started_session.select(player_one, 2) is True
+        assert started_session.select(player_one, 0) is False
 
 
 class TestSessionProgress:
@@ -215,6 +419,59 @@ class TestSessionProgress:
     cards played should have said cards and their positions, session progressed set to true, return true
     """
 
+    def test_progress_when_session_not_started(self, session_with_min_players: Session):
+        assert session_with_min_players.progress() is False
+
+    def test_progress_when_session_has_progressed(self, started_session: Session):
+        started_session.progressed = True
+
+        assert started_session.progress() is False
+
+    def test_progress_when_not_everyone_played_card(
+        self, started_session: Session, player_one: Player
+    ):
+        started_session.play(player_one, next(iter(player_one.hand)))
+
+        assert started_session.progress() is False
+
+    def test_progress_when_player_has_different_number_in_hand(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        player_one_card = next(iter(player_one.hand))
+
+        started_session.play(player_one, player_one_card)
+        started_session.play(player_two, next(iter(player_two.hand)))
+
+        player_one.hand.add(player_one_card)
+
+        assert started_session.progress() is False
+
+    def test_progress_when_smallest_row_not_selected(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        started_session.play(player_one, Card(1))
+        started_session.play(player_two, Card(2))
+
+        assert started_session.progress() is False
+
+    def test_progress(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        started_session.play(player_one, Card(1))
+        started_session.play(player_two, Card(2))
+
+        started_session.select(player_one, 1)
+        assert started_session.progress() is True
+
+        assert len(player_one.stack) == 1
+        assert len(player_two.stack) == 0
+
+        assert started_session.cards_played[player_one] == (Card(1), Position(1, 0))
+        assert started_session.cards_played[player_two] == (Card(2), Position(1, 1))
+
+        assert started_session.board.board[1] == [Card(1), Card(2)]
+        assert started_session.progressed is True
+
     ...
 
 
@@ -224,11 +481,54 @@ class TestSessionReset:
     - If turn has not progressed, return false
     - Reset smallest card player, selected row, cards to play, cards played, and progressed status to default values,
     return true
+    """
 
+    def test_reset_when_not_progressed(self, started_session: Session):
+        assert started_session.progressed is False
+        assert started_session.reset() is False
+
+    def test_reset(
+        self, started_session: Session, player_one: Player, player_two: Player
+    ):
+        started_session.play(player_one, Card(1))
+        started_session.play(player_two, Card(2))
+
+        started_session.select(player_one, 1)
+        assert started_session.smallest_card_player is player_one
+
+        started_session.progress()
+        assert started_session.progressed is True
+
+        assert started_session.reset() is True
+        assert started_session.smallest_card_player is None
+        assert started_session.selected_row is None
+        assert started_session.cards_to_play == {}
+        assert started_session.cards_played == {}
+        assert started_session.progressed is False
+
+    ...
+
+
+class TestSessionShouldEnd:
+    """
     should_end
     - If session has not start, return false
     - If there are players that has cards in hand, return false
     - else true
     """
 
-    ...
+    def test_session_should_end_when_not_started(self, session: Session):
+        assert session.started is False
+        assert session.should_end is False
+
+    def test_session_should_end_when_players_still_have_cards(
+        self, started_session: Session, player_one: Player
+    ):
+        assert len(player_one.hand) > 0
+        assert started_session.should_end is False
+
+    def test_session_should_end(self, started_session: Session):
+        for player in started_session.players:
+            player.hand = set()
+
+        assert started_session.should_end is True

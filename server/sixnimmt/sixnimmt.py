@@ -211,10 +211,10 @@ class Session:
         return True
 
     @property
-    def should_progress(self):
+    def should_select(self):
         if not self.started:
             self.logger.debug(
-                "session.should_start",
+                "session.should_select",
                 succeeded=False,
                 reason="Session has not started",
             )
@@ -222,7 +222,7 @@ class Session:
 
         if self.progressed:
             self.logger.debug(
-                "session.should_start",
+                "session.should_select",
                 succeeded=False,
                 reason="Turn has already progressed",
             )
@@ -230,7 +230,7 @@ class Session:
 
         if self.players != set(self.cards_to_play):
             self.logger.debug(
-                "session.should_start",
+                "session.should_select",
                 succeeded=False,
                 reason="Not everyone has played",
             )
@@ -238,22 +238,36 @@ class Session:
 
         if len(set(len(player.hand) for player in self.players)) > 1:
             self.logger.debug(
-                "session.should_start",
+                "session.should_select",
                 succeeded=False,
                 reason="Not everyone has same number of cards left",
             )
             return False
 
+        self.logger.debug("session.should_select", succeeded=True)
+
+        return True
+
+    @property
+    def should_progress(self):
+        if not self.should_select:
+            self.logger.debug(
+                "session.should_progress",
+                succeeded=False,
+                reason="Turn is not ready to move to selection stage",
+            )
+            return False
+
         if self.smallest_card_player is not None and self.selected_row is None:
             self.logger.debug(
-                "session.should_start",
+                "session.should_progress",
                 succeeded=False,
                 player=self.smallest_card_player.player_id,
                 reason="A row has not been selected",
             )
             return False
 
-        self.logger.debug("session.should_start", succeeded=True)
+        self.logger.debug("session.should_progress", succeeded=True)
 
         return True
 
@@ -374,11 +388,11 @@ class Session:
     def select(self, player: Player, row: int) -> bool:
         log = self.logger.bind(player_id=player.player_id, row=row)
 
-        if not self.should_progress:
+        if not self.should_select:
             log.warning(
                 "session.select",
                 succeeded=False,
-                reason="Turn is not ready to progress",
+                reason="Turn is not ready to move to selection stage",
             )
             return False
 
